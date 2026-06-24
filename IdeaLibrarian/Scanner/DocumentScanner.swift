@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(PDFKit)
 import PDFKit
+#endif
 
 public class DocumentScanner {
     public let acceptedExtensions: Set<String> = ["json", "txt", "md", "pdf", "docx", "py", "swift"]
@@ -62,6 +64,7 @@ public class DocumentScanner {
     }
 
     public func extractPDFText(from url: URL) -> String? {
+        #if canImport(PDFKit)
         guard let document = PDFDocument(url: url) else { return nil }
         if let text = document.string?.trimmingCharacters(in: .whitespacesAndNewlines),
            !text.isEmpty {
@@ -80,6 +83,47 @@ public class DocumentScanner {
 
         let joined = collected.joined(separator: "\n\n").trimmingCharacters(in: .whitespacesAndNewlines)
         return joined.isEmpty ? nil : joined
+        #else
+        return extractPDFTextWithExternalTool(from: url)
+        #endif
+    }
+
+    private func extractPDFTextWithExternalTool(from url: URL) -> String? {
+        #if os(Windows)
+        let candidates = ["pdftotext.exe", "pdftotext"]
+        #else
+        let candidates = ["pdftotext"]
+        #endif
+
+        for command in candidates {
+            if let output = runPDFToText(command: command, fileURL: url) {
+                return output
+            }
+        }
+
+        return nil
+    }
+
+    private func runPDFToText(command: String, fileURL: URL) -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: command)
+        process.arguments = [fileURL.path, "-"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !text.isEmpty else { return nil }
+            return text
+        } catch {
+            return nil
+        }
     }
 
     public func decodeTextLenient(_ data: Data) -> String? {
