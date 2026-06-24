@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 public class DeepSeekClient {
     private let apiKey: String
@@ -84,7 +87,6 @@ private struct DeepSeekChatResponse: Codable {
     let created: Int
     let model: String
     let choices: [Choice]
-    let usage: Usage
 
     struct Choice: Codable {
         let index: Int
@@ -102,19 +104,9 @@ private struct DeepSeekChatResponse: Codable {
         let role: String
         let content: String?
     }
-
-    struct Usage: Codable {
-        let promptTokens: Int
-        let completionTokens: Int
-        let totalTokens: Int
-
-        enum CodingKeys: String, CodingKey {
-            case promptTokens = "prompt_tokens"
-            case completionTokens = "completion_tokens"
-            case totalTokens = "total_tokens"
-        }
-    }
 }
+
+// MARK: - Error Types
 
 public enum DeepSeekError: LocalizedError {
     case emptyResponse
